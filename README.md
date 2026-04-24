@@ -125,11 +125,16 @@ This project simulates real-world **Security Operations Center (SOC)** workflows
 
 ---
 
-## 📷 Screenshots (Add your own)
+## 📷 Screenshots
 
-![alt text](image.png)
-![alt text](image-1.png)
-![alt text](image-2.png)
+### Dashboard
+![Dashboard](screenshots/dashboard.png)
+
+### Threat Map
+![Map](screenshots/map.png)
+
+### Analytics
+![Charts](screenshots/charts.png)
 ---
 
 ## 👤 Author
