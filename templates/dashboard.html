@@ -1,0 +1,214 @@
+<html>
+<head>
+<title>Threat Intelligence Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+body {
+    background-color: #0f172a;
+    color: #e2e8f0;
+    font-family: Arial;
+}
+.container {
+    max-width: 1100px;
+    margin: auto;
+}
+h1, h2 {
+    text-align: center;
+}
+input, textarea {
+    width: 80%;
+    padding: 10px;
+    margin: 5px;
+    border-radius: 6px;
+    border: none;
+}
+button {
+    padding: 10px 15px;
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th {
+    background-color: #1e293b;
+    padding: 10px;
+}
+td {
+    text-align: center;
+    padding: 8px;
+    border-bottom: 1px solid #334155;
+}
+.badge {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-weight: bold;
+}
+.safe { background-color: #22c55e; }
+.suspicious { background-color: #facc15; color: black; }
+.malicious { background-color: #ef4444; }
+.chart-container {
+    width: 700px;
+    margin: 30px auto;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🛡️ Threat Intelligence Dashboard</h1>
+
+<form method="POST" style="text-align:center;">
+<input name="ip" placeholder="Enter IP Address">
+<button type="submit">Check IP</button>
+</form>
+
+<h2>📂 Log Analyzer</h2>
+
+<form method="POST" style="text-align:center;">
+<textarea name="log_data" rows="5" placeholder="Paste logs here..."></textarea><br>
+<button type="submit">Analyze Logs</button>
+</form>
+
+<h2>📂 Upload Log File</h2>
+
+<form method="POST" enctype="multipart/form-data" style="text-align:center;">
+<input type="file" name="file" accept=".txt"><br><br>
+<button type="submit">Upload & Analyze</button>
+</form>
+
+<div style="text-align:center; margin-top:20px;">
+<a href="/export"><button>📄 Download Report</button></a>
+</div>
+
+<h2>Results</h2>
+
+<p style="text-align:center;">
+Safe: {{ results | selectattr("threat_level","equalto","Safe") | list | length }} |
+Suspicious: {{ results | selectattr("threat_level","equalto","Suspicious") | list | length }} |
+Malicious: {{ results | selectattr("threat_level","equalto","Malicious") | list | length }}
+</p>
+
+<table>
+<tr>
+<th>IP</th>
+<th>Country</th>
+<th>Organization</th>
+<th>Reports</th>
+<th>Threat Level</th>
+</tr>
+
+{% for r in results %}
+<tr>
+<td>{{r.ip}}</td>
+<td>{{r.country}}</td>
+<td>{{r.org}}</td>
+<td>{{r.reports}}</td>
+<td>
+<span class="badge
+{% if r.threat_level == 'Safe' %}safe
+{% elif r.threat_level == 'Suspicious' %}suspicious
+{% else %}malicious
+{% endif %}">
+{{ r.threat_level }}
+</span>
+</td>
+</tr>
+{% endfor %}
+</table>
+
+<div class="chart-container">
+<h2>Threat Scores</h2>
+<canvas id="threatChart"></canvas>
+</div>
+
+<div class="chart-container">
+<h2>Top Threat Countries</h2>
+<canvas id="countryChart"></canvas>
+</div>
+
+<div style="width:90%; margin:auto;">
+<h2>🌍 Threat Map</h2>
+<div id="map" style="height:400px;"></div>
+</div>
+
+<script>
+// Charts
+const labels = [{% for r in results %}'{{ r.ip }}',{% endfor %}];
+const scores = [{% for r in results %}{{ r.confidence_score }},{% endfor %}];
+
+new Chart(document.getElementById('threatChart'), {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Threat Score',
+            data: scores,
+            backgroundColor: scores.map(s => {
+                if (s < 20) return '#22c55e';
+                else if (s < 60) return '#facc15';
+                else return '#ef4444';
+            })
+        }]
+    }
+});
+
+// Country chart
+const countryCounts = {};
+{% for r in results %}
+countryCounts['{{ r.country }}'] = (countryCounts['{{ r.country }}'] || 0) + 1;
+{% endfor %}
+
+new Chart(document.getElementById('countryChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(countryCounts),
+        datasets: [{
+            label: 'Threat Sources',
+            data: Object.values(countryCounts)
+        }]
+    }
+});
+
+// Map
+var map = L.map('map').setView([20, 0], 2);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+{% for r in results %}
+if ({{ r.lat }} && {{ r.lon }}) {
+    var color = "{{ r.threat_level }}" === "Safe" ? "green" :
+                "{{ r.threat_level }}" === "Suspicious" ? "orange" : "red";
+
+    var marker = L.circleMarker([{{ r.lat }}, {{ r.lon }}], {
+        color: color,
+        radius: 8
+    }).addTo(map);
+
+    marker.bindPopup(`
+        <b>IP:</b> {{ r.ip }}<br>
+        <b>Country:</b> {{ r.country }}<br>
+        <b>Threat:</b> {{ r.threat_level }}
+    `);
+}
+{% endfor %}
+</script>
+
+</div>
+
+</body>
+</html>
